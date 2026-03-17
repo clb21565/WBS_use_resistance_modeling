@@ -1,4 +1,5 @@
-# WBS_use_resistance_modeling
+# MANUSCRIPT CODE REPO: Resistance Indicators in Sewage Microbiota Mirror Clinical Antibiotic Use with Variable Temporal Lag Linked to Host Taxonomy 
+
+Here are deposited custom scripts and code for Brown et al. 2026. 
 
 
-here are scripts and data for an upcoming publication investigating the correlation between outpatient antibiotic usage and sewage-borne resistance genes
