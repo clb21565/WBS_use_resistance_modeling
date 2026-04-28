@@ -1,0 +1,189 @@
+
+use=fread("240323_ABXUSEDATAFORMODELING.csv")[,-1]
+
+op_pdf=fread("240614-op_metadata-for-modeling.csv")
+mcp=fread("240614-crassphage-for-modeling.csv")
+
+crass=mcp[,c("sample","minmax_crassphage")]%>%unique()
+
+data=fread("240616-reformatted-mag-abundance-data-pseudomonas-modeling.csv")[,-1]
+inf_flow=op_pdf%>%subset(Stage=="Influent"&variable=="Flow (MGD)")%>%mutate(x=(ordered_week/4)-0.25,IF=mean)
+
+sxt_use=use%>%subset(k==4)%>%subset(grepl("Folate Antag",drug_class))%>%mutate(x=(ordered_week/4)-0.25,use=lagged_value)
+mluse=use%>%subset(k==8)%>%subset(grepl("Macroli",drug_class))%>%mutate(x=(ordered_week/4)-0.25,use=lagged_value)
+use_data=sxt_use[,c("x","use")]
+
+
+#model 2
+model_pseudomonas_MAGs_no_use=function(gnid){
+  
+  #  gnid="gs43"
+  period=12
+  omega = 2*pi/period
+  
+  idf=data%>%subset(genomeid==gnid)
+  
+  start_intercept=mean(idf$y)
+  
+  start_slope=0
+  
+  model = nls(y ~ amplitude * cos(omega * (x - phase)) +  # sinusoidal component
+                intercept, # 
+              
+              start = list(amplitude = 0.1,
+                           phase = 0,
+                           intercept = start_intercept),data=idf)
+  
+  coeffs=summary(model)$coefficients%>%
+    as_tibble(rownames = "term") %>%
+    magrittr::set_colnames(c("term","estimate","std.error","statistic","p.value")) 
+  cints=confint.default(model) %>%
+    magrittr::set_colnames(c("ci.lower", "ci.upper")) %>%
+    as_tibble(rownames = "term")
+  aic=AIC(model)  
+  
+  out=data.frame(coeffs,cints)[,c("term","estimate","std.error","statistic","p.value","ci.lower","ci.upper")]
+  out$AIC=aic
+  out$period=period
+  out.adj=convert_a_phases_func(out)
+  out$p.adj=p.adjust(out$p.value)
+  out$raw_or_adjusted="raw"
+  out.adj$raw_or_adjusted="adj" 
+  fo=rbind.fill(out,out.adj)
+  fo$genomeid=gnid
+  fo$period=period
+  
+  SSE=sum((idf$y - fitted(model))^2)
+  SST=sum((idf$y - mean(idf$y))^2)
+  
+  R2=1-SSE/SST
+  fo$R2=R2
+  return(fo)
+  
+}
+mags=unique(data$genomeid)
+wo_use=ldply(lapply(mags,model_pseudomonas_MAGs_no_use))
+wo_use%>%write.csv("240616-no_use-models.csv")
+
+## model 3 
+model_pseudomonas_MAGs_w_use=function(gnid){
+  #  gnid="gs43"
+  period=12
+  omega = 2*pi/period
+  
+  idf=data%>%subset(genomeid==gnid)%>%merge(.,use_data,by="x")
+  
+  B_SXT_st=0
+  start_slope=0
+  start_intercept=mean(idf$y)
+  
+  model = nls(y ~ amplitude * cos(omega * (x - phase)) +  
+                B_SXT*use+
+                intercept, start = list(
+                  amplitude = 0.1,
+                  phase = 0,
+                  B_SXT=B_SXT_st,
+                  intercept = start_intercept),
+              
+              data=idf)
+  
+  
+  
+  
+  coeffs=summary(model)$coefficients%>%
+    as_tibble(rownames = "term") %>%
+    magrittr::set_colnames(c("term","estimate","std.error","statistic","p.value")) 
+  cints=confint.default(model) %>%
+    magrittr::set_colnames(c("ci.lower", "ci.upper")) %>%
+    as_tibble(rownames = "term")
+  aic=AIC(model)  
+  
+  out=data.frame(coeffs,cints)[,c(
+    "term","estimate","std.error",
+    "statistic","p.value","ci.lower",
+    "ci.upper")]
+  
+  out$AIC=aic
+  out$period=period
+  out.adj=convert_a_phases_func(out)
+  out$p.adj=p.adjust(out$p.value)
+  out$raw_or_adjusted="raw"
+  out.adj$raw_or_adjusted="adj" 
+  fo=rbind.fill(out,out.adj)
+  fo$genomeid=gnid
+  fo$period=period
+  
+  SSE=sum((idf$y - fitted(model))^2)
+  SST=sum((idf$y - mean(idf$y))^2)
+  
+  R2=1-SSE/SST
+  fo$R2=R2
+  return(fo)
+  
+}
+mags=unique(data$genomeid)
+w_use=ldply(lapply(mags,model_pseudomonas_MAGs_w_use))
+#w_use%>%subset(term=="B_SXT")%>%ggplot(aes(estimate))+geom_histogram()
+##w_use%>%subset(term=="B_SXT")%>%subset(estimate>1)
+
+w_use%>%write.csv("240616-with_use-only.csv")
+
+## model 4
+model_pseudomonas_MAGs_w_use_and_controls=function(gnid){
+  #gnid="gs43"
+  period=12
+  omega = 2*pi/period
+  
+  idf=data%>%subset(genomeid==gnid)%>%
+    merge(.,use_data,by="x")%>%
+    merge(.,inf_flow[,c("Date","IF")]%>%unique(),by="Date")%>%merge(.,crass,by="sample")
+  
+  B_SXT_st=0
+  B_IF_st=0
+  B_Crass_st=0
+  DOW_st=0
+  start_slope=0
+  
+  start_intercept=mean(idf$y)
+  
+  model = nls(y ~ amplitude * cos(omega * (x - phase))+B_SXT*use+ B_IF*IF+B_Crass*minmax_crassphage+DOW*DW+intercept, 
+              
+              start = list(amplitude = 0.1,phase = 0,B_SXT=B_SXT_st,B_Crass=B_Crass_st,B_IF=B_IF_st,DOW=DOW_st,intercept = start_intercept),
+              
+              data=idf)
+  
+  coeffs=summary(model)$coefficients%>%
+    as_tibble(rownames = "term") %>%
+    magrittr::set_colnames(c("term","estimate","std.error","statistic","p.value")) 
+  cints=confint.default(model) %>%
+    magrittr::set_colnames(c("ci.lower", "ci.upper")) %>%
+    as_tibble(rownames = "term")
+  aic=AIC(model)  
+  
+  out=data.frame(coeffs,cints)[,c(
+    "term","estimate","std.error",
+    "statistic","p.value","ci.lower",
+    "ci.upper")]
+  
+  out$AIC=aic
+  out$period=period
+  out.adj=convert_a_phases_func(out)
+  out$p.adj=p.adjust(out$p.value)
+  out$raw_or_adjusted="raw"
+  out.adj$raw_or_adjusted="adj" 
+  fo=rbind.fill(out,out.adj)
+  fo$genomeid=gnid
+  fo$period=period
+  
+  SSE=sum((idf$y - fitted(model))^2)
+  SST=sum((idf$y - mean(idf$y))^2)
+  
+  R2=1-SSE/SST
+  fo$R2=R2
+  return(fo)
+  
+}
+
+mags=unique(data$genomeid)
+w_use_etal=ldply(lapply(mags,model_pseudomonas_MAGs_w_use_and_controls))
+w_use_etal%>%write.csv("240616-with_use_models_etal.csv")
