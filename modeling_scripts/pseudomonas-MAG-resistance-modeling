@@ -1,11 +1,13 @@
+library(tidyr)
+library(dplyr)
+library(data.table)
+library(plyr)
+`%notin%` <- Negate(`%in%`)
 
 use=fread("240323_ABXUSEDATAFORMODELING.csv")[,-1]
-
 op_pdf=fread("240614-op_metadata-for-modeling.csv")
 mcp=fread("240614-crassphage-for-modeling.csv")
-
 crass=mcp[,c("sample","minmax_crassphage")]%>%unique()
-
 data=fread("240616-reformatted-mag-abundance-data-pseudomonas-modeling.csv")[,-1]
 inf_flow=op_pdf%>%subset(Stage=="Influent"&variable=="Flow (MGD)")%>%mutate(x=(ordered_week/4)-0.25,IF=mean)
 
@@ -13,6 +15,10 @@ sxt_use=use%>%subset(k==4)%>%subset(grepl("Folate Antag",drug_class))%>%mutate(x
 mluse=use%>%subset(k==8)%>%subset(grepl("Macroli",drug_class))%>%mutate(x=(ordered_week/4)-0.25,use=lagged_value)
 use_data=sxt_use[,c("x","use")]
 
+
+cos_func = function(month, amplitude, phase, omega,intercept) {
+  amplitude * cos(omega *(month - phase)) + intercept
+}
 
 #model 2
 model_pseudomonas_MAGs_no_use=function(gnid){
