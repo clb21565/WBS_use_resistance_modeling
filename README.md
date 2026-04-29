@@ -27,7 +27,7 @@ install.packages(c(
 ### Running the demo
 
 ```r
-source("pseudomonas_modeling_demo.R")
+source("mag_seasonality_modeling_demo.R")
 ```
 
 No input files are required — all data are generated within the script. However, the scripts used to run the real data are also provided (plotting_pseudomonas_modeling_results.R and pseudomonas-MAG-resistance-modeling.R). 
