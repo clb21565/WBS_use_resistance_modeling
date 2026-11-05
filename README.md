@@ -1,6 +1,8 @@
 # WBS Use-Resistance Modeling
 
-R code for modeling the relationship between outpatient antibiotic use and antibiotic resistance gene (ARG) abundance in wastewater, as described in Brown et al. 2024: https://www.medrxiv.org/content/10.1101/2024.12.11.24318846v1
+R code for modeling the relationship between outpatient antibiotic use and antibiotic resistance gene (ARG) abundance in wastewater. 
+From 
+Brown, C.L., Rumi, M., McDaniel, L. et al. Resistance indicators in sewage microbiota mirror clinical antibiotic use with temporal lag linked to host. Nat Commun (2026). https://doi.org/10.1038/s41467-026-78142-3
 
 ## Demo Script
 
